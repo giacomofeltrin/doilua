@@ -1,0 +1,13 @@
+# Bootstrap
+- Create a bootable USB key with the Ubuntu Server ISO.
+- Connect the device to the router via Ethernet and insert the USB key.
+- Turn on the device and repeatedly press **F1** or **ESC** to access the BIOS/UEFI settings.
+- Set the boot priority to start from the USB key.
+- Let it update to the most recent version.
+- Select **English** as the preferred language.
+- Choose **Italian** as the keyboard layout.
+- Accept the default network configuration.
+- Select the option to use the entire disk with the default storage setup.
+- Set **username**: `giacomo` and a secure **password**.
+- Install **OpenSSH** (configure SSH keys later).
+- Install **microk8s** and **Docker**.
