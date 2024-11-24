@@ -1,114 +1,59 @@
-# Not working
-vim gotosocial.yaml
-'''
+mkdir -p ~/gotosocial/data
+cd ~/gotosocial
+wget https://raw.githubusercontent.com/superseriousbusiness/gotosocial/main/example/docker-compose/docker-compose.yaml
+vim docker-compose.yaml
 
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: gotosocial
+```
+services:
+  gotosocial:
+    image: superseriousbusiness/gotosocial:latest
+    container_name: gotosocial
+    user: 1000:1000
+    networks:
+      - gotosocial
+    environment:
+      # Change this to your actual host value.
+      GTS_HOST: x.vitrua.top
+      GTS_DB_TYPE: sqlite
+      # Path in the GtS Docker container where
+      # the sqlite.db file will be stored.
+      GTS_DB_ADDRESS: /gotosocial/storage/sqlite.db
+      # Change this to true if you're not running
+      # GoToSocial behind a reverse proxy.
+      GTS_LETSENCRYPT_ENABLED: "true"
+      # Set your email address here if you
+      # want to receive letsencrypt notices.
+      GTS_LETSENCRYPT_EMAIL_ADDRESS: "vitrua.studio@gmail.com"
+      # Path in the GtS Docker container where the
+      # Wazero compilation cache will be stored.
+      GTS_WAZERO_COMPILATION_CACHE: /gotosocial/.cache
+      ## For reverse proxy setups:
+      # GTS_TRUSTED_PROXIES: "172.x.x.x"
+      ## Set the timezone of your server:
+      TZ: Europe/Rome
+    ports:
+      - "443:8080"
+      ## For letsencrypt:
+      - "80:80"
+      ## For reverse proxy setups:
+      #- "127.0.0.1:8080:8080"
+    volumes:
+      # Your data volume, for your
+      # sqlite.db file and media files.
+      - ~/gotosocial/data:/gotosocial/storage
+      # OPTIONAL: To mount volume for the WAZERO
+      # compilation cache, for speedier restart
+      # times, uncomment the below line:
+      - ~/gotosocial/.cache:/gotosocial/.cache
+    restart: "always"
 
----
+networks:
+  gotosocial:
+    ipam:
+      driver: default
 
-apiVersion: v1
-kind: Secret
-metadata:
-  name: gotosocial-config
-  namespace: gotosocial
-type: Opaque
-data:
-  database-url: c3FsaXRlOi8vZGF0YS9nb3Rvc29jaWFsLmRi
-  admin-username: YWRtaW4=
-  admin-password: c3VwZXJzZWNyZXRwYXNzd29yZA==
-
----
-
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: gotosocial
-  namespace: gotosocial
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: gotosocial
-  template:
-    metadata:
-      labels:
-        app: gotosocial
-    spec:
-      containers:
-      - name: gotosocial
-        image: superseriousbusiness/gotosocial:latest
-        ports:
-        - containerPort: 8080
-        envFrom:
-        - secretRef:
-            name: gotosocial-config
-        volumeMounts:
-        - mountPath: /data
-          name: data
-      volumes:
-      - name: data
-        emptyDir: {}
-
----
-
-apiVersion: v1
-kind: Service
-metadata:
-  name: gotosocial
-  namespace: gotosocial
-spec:
-  selector:
-    app: gotosocial
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8080
-  type: ClusterIP
-
----
+```
+mkdir -p ~/gotosocial/.cache
 
 
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: gotosocial
-  namespace: gotosocial
-  annotations:
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
-    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
-spec:
-  rules:
-  - host: social.vitrua.top
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: gotosocial
-            port:
-              number: 80
-  tls:
-  - hosts:
-    - social.vitrua.top
-
-
-'''
-
-
-microk8s kubectl apply -f gotosocial.yaml
-
-
-
-
-
-# working
-
-microk8s kubectl create ns gts-test
-microk8s kubectl create secret generic gts-postgresql-secret --from-literal="password=$(openssl rand -hex 32)" --from-literal="postgres-password=$(openssl rand -hex 32)" -n gts-test
-microk8s helm repo add fsociety https://charts.fsociety.social
-microk8s helm repo update
-microk8s helm upgrade --install gotosocial fsociety/gotosocial --namespace gotosocial --create-namespace --set gotosocial.config.host='domain.tld' --set gotosocial.config.accountDomain='domain.tld'
+docker-compose up -d

@@ -1,83 +1,61 @@
-microk8s helm repo add traefik https://traefik.github.io/charts
-microk8s helm repo update
-microk8s kubectl create namespace traefik
+mkdir traefik
+cd traefik
+docker network create traefik-public
 
-vim chart-traefik.yaml
+vim docker-compose.yml
 
 ```
-namespaceOverride: traefik
+version: "3.9"
 
-# Deployment configuration
-deployment:
-  enabled: true
-  replicas: 1
-  kind: Deployment
+services:
+  reverse-proxy:
+    image: traefik:v3.2
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entryPoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.myresolver.acme.email=vitrua.studio@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"     # HTTP
+      - "443:443"   # HTTPS
+      - "8080:8080" # Traefik dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt" # Volume for storing certificates
 
-# Ingress Class configuration
-ingressClass:
-  enabled: true
-  isDefaultClass: true
+  gotosocial:
+    image: superseriousbusiness/gotosocial:latest
+    container_name: gotosocial
+    user: "1000:1000"
+    environment:
+      GTS_HOST: x.vitrua.top
+      GTS_DB_TYPE: sqlite
+      GTS_DB_ADDRESS: /gotosocial/storage/sqlite.db
+      GTS_LETSENCRYPT_ENABLED: "true"
+      GTS_LETSENCRYPT_EMAIL_ADDRESS: "vitrua.studio@gmail.com"
+      GTS_WAZERO_COMPILATION_CACHE: /gotosocial/.cache
+      TZ: Europe/Rome
+    volumes:
+      - ~/gotosocial/data:/gotosocial/storage
+      - ~/gotosocial/.cache:/gotosocial/.cache
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.gotosocial.rule=Host(`x.vitrua.top`)"
+      - "traefik.http.routers.gotosocial.entrypoints=websecure"
+      - "traefik.http.routers.gotosocial.tls.certresolver=myresolver"
+    networks:
+      - default
+    restart: always
 
-# Providers configuration
-providers:
-  kubernetesIngress:
-    enabled: true
-    ingressEndpoint:
-      useDefaultPublishedService: true
-  kubernetesCRD:
-    enabled: true
-
-# Ports configuration
-ports:
-  web:
-    port: 8000
-    expose:
-      default: true
-    exposedPort: 80
-    protocol: TCP
-    redirectTo:
-      name: websecure  # Correct format: redirect HTTP to HTTPS
-      port: "443"      # Port must be quoted as a string
-  websecure:
-    port: 8443
-    expose:
-      default: true
-    exposedPort: 443
-    protocol: TCP
-    tls:
-      enabled: true  # Enable TLS for HTTPS
-
-# Certificates resolvers configuration
-certificatesResolvers:
-  letsencrypt:
-    acme:
-      email: vitruastudio@gmail.com  # Replace with your email
-      storage: /data/acme.json  # Storage for ACME data
-      tlsChallenge: {}  # Enable TLS-ALPN-01 challenge for ACME
-
-# Persistence configuration for ACME data storage
-persistence:
-  enabled: true
-  size: 128Mi
-  accessMode: ReadWriteOnce
-  path: /data  # Path for storing ACME data (certificates)
-
-# Service configuration to expose Traefik
-service:
-  type: LoadBalancer  # Expose as LoadBalancer (can be NodePort depending on your cloud provider)
-  annotations:
-    external-dns.alpha.kubernetes.io/hostname: social.vitrua.top  # Automatically create DNS record for your domain
-
-# Resource limits for Traefik container (optional)
-resources: {}
-
-
-
+networks:
+  default:
+    name: traefik-public
+    external: true
 
 ```
 
-
-
-microk8s helm install -f chart-traefik.yaml traefik traefik/traefik --namespace traefik
-
-
+docker-compose up -d reverse-proxy

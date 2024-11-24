@@ -11,12 +11,11 @@ server_init.sh
 ### Lap Init
 lap_init
 
+(OLD)
 ### K8s
-k8s.md
-
+old/k8s.md
 ### Traefik
-traefik.md
-
+old/traefik.md
 ### GoToSocial
-gotosocial.md
+old/gotosocial.md
 
